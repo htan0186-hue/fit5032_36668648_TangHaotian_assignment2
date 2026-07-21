@@ -177,11 +177,19 @@ Recommended four UX-focused innovation features:
 
 ### Phase 3 - C Requirements
 
-- Add registration/login/account flow.
-- Add role-based route protection.
+- Add registration/login/account flow. - Partially complete
+- Add role-based route protection. - Partially complete
 - Add user/admin roles.
 - Add rating and average rating display.
 - Add basic security measures around input handling and route access.
+
+Current C progress:
+
+- C.1 authentication half is implemented with local demo registration, login, logout, session persistence and account management.
+- C.2 role access half is implemented with visitor/member/admin differences.
+- Member-only access controls protect My Plan saving and activity registration.
+- Admin-only access controls protect the Admin statistics and user table section.
+- C.3 rating and the full C.4 security pass remain for the next stage.
 
 ### Phase 4 - D Requirements
 

@@ -22,6 +22,25 @@ SilverLink is a Vue 3 web application for older adults, family supporters and ca
   - service filtering
   - saved My Plan items using Vue state and Local Storage
 
+### Business Requirement C - In Progress
+
+- C.1: Basic authentication is partially implemented:
+  - member account registration
+  - login and logout
+  - account/profile management
+  - persistent local demo session
+- C.2: Basic role-based access is implemented:
+  - visitors can browse public services and activities
+  - logged-in members can save My Plan items and submit activity registrations
+  - admins can access the protected Admin area
+
+Admin demo account:
+
+- Email: `admin@silverlink.test`
+- Password: `AdminPass123`
+
+C.3 rating and the full C.4 security pass are planned for the next development stage.
+
 ## Run Locally
 
 ```bash

@@ -13,7 +13,16 @@
           <a href="#services">Find Support</a>
           <a href="#activities">Activities</a>
           <a href="#plan">My Plan</a>
+          <a href="#account">Account</a>
+          <a v-if="isAdmin" href="#admin">Admin</a>
           <a href="#contact">Contact</a>
+        </div>
+        <div class="nav-account" aria-label="Account status">
+          <span v-if="currentUser">Signed in as {{ currentUser.role }}</span>
+          <a v-else href="#account">Sign in</a>
+          <button v-if="currentUser" class="text-button" type="button" @click="logout">
+            Log out
+          </button>
         </div>
       </nav>
     </header>
@@ -58,6 +67,10 @@
               <strong>{{ savedPlan.length }}</strong>
               <span>saved items</span>
             </li>
+            <li>
+              <strong>{{ users.length }}</strong>
+              <span>demo users</span>
+            </li>
           </ul>
         </div>
       </section>
@@ -87,6 +100,142 @@
             anything is stored.
           </p>
         </article>
+      </section>
+
+      <section id="account" class="section account-section" aria-labelledby="account-title">
+        <div class="section-heading">
+          <p class="eyebrow">Account Access</p>
+          <h2 id="account-title">Sign in to save, register and manage details</h2>
+          <p>
+            SilverLink now includes the first half of Category C: local account
+            registration, login, profile management and role-based access.
+          </p>
+        </div>
+
+        <div v-if="!currentUser" class="auth-layout">
+          <form class="form-panel auth-card" novalidate @submit.prevent="login">
+            <h3>Log in</h3>
+            <p class="muted">Admin demo: admin@silverlink.test / AdminPass123</p>
+            <label>
+              <span>Email *</span>
+              <input
+                v-model.trim="loginForm.email"
+                type="email"
+                autocomplete="email"
+                :aria-invalid="Boolean(authErrors.loginEmail)"
+              />
+              <small v-if="authErrors.loginEmail" class="error">{{ authErrors.loginEmail }}</small>
+            </label>
+            <label>
+              <span>Password *</span>
+              <input
+                v-model="loginForm.password"
+                type="password"
+                autocomplete="current-password"
+                :aria-invalid="Boolean(authErrors.loginPassword)"
+              />
+              <small v-if="authErrors.loginPassword" class="error">
+                {{ authErrors.loginPassword }}
+              </small>
+            </label>
+            <button class="button primary full" type="submit">Log in</button>
+          </form>
+
+          <form class="form-panel auth-card" novalidate @submit.prevent="registerUser">
+            <h3>Create member account</h3>
+            <p class="muted">New accounts are created with the member role.</p>
+            <label>
+              <span>Full name *</span>
+              <input
+                v-model.trim="registerForm.name"
+                type="text"
+                autocomplete="name"
+                :aria-invalid="Boolean(authErrors.registerName)"
+              />
+              <small v-if="authErrors.registerName" class="error">
+                {{ authErrors.registerName }}
+              </small>
+            </label>
+            <label>
+              <span>Email *</span>
+              <input
+                v-model.trim="registerForm.email"
+                type="email"
+                autocomplete="email"
+                :aria-invalid="Boolean(authErrors.registerEmail)"
+              />
+              <small v-if="authErrors.registerEmail" class="error">
+                {{ authErrors.registerEmail }}
+              </small>
+            </label>
+            <label>
+              <span>Password *</span>
+              <input
+                v-model="registerForm.password"
+                type="password"
+                autocomplete="new-password"
+                :aria-invalid="Boolean(authErrors.registerPassword)"
+              />
+              <small v-if="authErrors.registerPassword" class="error">
+                {{ authErrors.registerPassword }}
+              </small>
+            </label>
+            <label>
+              <span>Confirm password *</span>
+              <input
+                v-model="registerForm.confirmPassword"
+                type="password"
+                autocomplete="new-password"
+                :aria-invalid="Boolean(authErrors.confirmPassword)"
+              />
+              <small v-if="authErrors.confirmPassword" class="error">
+                {{ authErrors.confirmPassword }}
+              </small>
+            </label>
+            <button class="button primary full" type="submit">Create account</button>
+          </form>
+        </div>
+
+        <div v-else class="account-dashboard">
+          <article class="profile-summary">
+            <span class="tag">{{ currentUser.role }}</span>
+            <h3>Welcome, {{ currentUser.name }}</h3>
+            <p>{{ currentUser.email }}</p>
+            <p class="muted">
+              Your account controls access to saved plans, activity registration and
+              role-specific tools.
+            </p>
+          </article>
+
+          <form class="form-panel profile-form" novalidate @submit.prevent="updateAccount">
+            <h3>Manage account</h3>
+            <label>
+              <span>Display name *</span>
+              <input
+                v-model.trim="accountForm.name"
+                type="text"
+                autocomplete="name"
+                :aria-invalid="Boolean(authErrors.accountName)"
+              />
+              <small v-if="authErrors.accountName" class="error">{{ authErrors.accountName }}</small>
+            </label>
+            <label>
+              <span>Phone</span>
+              <input v-model.trim="accountForm.phone" type="tel" autocomplete="tel" />
+            </label>
+            <label>
+              <span>Accessibility preferences</span>
+              <textarea
+                v-model.trim="accountForm.preferences"
+                rows="4"
+                placeholder="Example: large-print information, phone reminders, step-free venues"
+              ></textarea>
+            </label>
+            <button class="button primary full" type="submit">Update account</button>
+          </form>
+        </div>
+
+        <p v-if="authMessage" class="success" role="status">{{ authMessage }}</p>
       </section>
 
       <section id="services" class="section feature-section" aria-labelledby="services-title">
@@ -194,7 +343,7 @@
             </article>
           </div>
 
-          <form class="form-panel" novalidate @submit.prevent="submitRegistration">
+          <form v-if="currentUser" class="form-panel" novalidate @submit.prevent="submitRegistration">
             <h3>Activity registration form</h3>
             <p class="muted">Fields marked with * are required.</p>
 
@@ -255,6 +404,14 @@
             <button class="button primary full" type="submit">Submit registration</button>
             <p v-if="successMessage" class="success" role="status">{{ successMessage }}</p>
           </form>
+          <aside v-else class="locked-panel" aria-labelledby="activity-lock-title">
+            <h3 id="activity-lock-title">Member access required</h3>
+            <p>
+              Visitors can browse activities, but registration is available after
+              signing in or creating a member account.
+            </p>
+            <a class="button primary" href="#account">Sign in to register</a>
+          </aside>
         </div>
       </section>
 
@@ -283,6 +440,69 @@
         <p v-else class="empty-state">No saved items yet. Save a service or activity to build a simple plan.</p>
       </section>
 
+      <section id="admin" class="section admin-section" aria-labelledby="admin-title">
+        <div class="section-heading">
+          <p class="eyebrow">Admin Access</p>
+          <h2 id="admin-title">Role-protected administration area</h2>
+          <p>
+            This section demonstrates role-based authorization. Only users with the
+            admin role can view management statistics and member records.
+          </p>
+        </div>
+
+        <div v-if="isAdmin" class="admin-dashboard">
+          <article class="metric-card">
+            <strong>{{ services.length }}</strong>
+            <span>services managed</span>
+          </article>
+          <article class="metric-card">
+            <strong>{{ events.length }}</strong>
+            <span>events managed</span>
+          </article>
+          <article class="metric-card">
+            <strong>{{ memberCount }}</strong>
+            <span>member accounts</span>
+          </article>
+          <article class="metric-card">
+            <strong>{{ savedPlan.length }}</strong>
+            <span>saved plan items</span>
+          </article>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <caption>
+                Registered users
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Phone</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="user in users" :key="user.id">
+                  <td>{{ user.name }}</td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.role }}</td>
+                  <td>{{ user.phone || 'Not provided' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-else class="locked-panel">
+          <h3>Admin role required</h3>
+          <p>
+            Sign in with an administrator account to view management tools. Member
+            accounts can still save plans and register for activities.
+          </p>
+          <a class="button primary" href="#account">Go to account access</a>
+        </div>
+      </section>
+
       <section id="contact" class="section contact-section" aria-labelledby="contact-title">
         <div>
           <p class="eyebrow">Help And Contact</p>
@@ -307,12 +527,48 @@ import { computed, reactive, ref, watch } from 'vue'
 import { events, serviceCategories, services } from './data/silverlinkData'
 
 const STORAGE_KEY = 'silverlink-saved-plan'
+const USERS_KEY = 'silverlink-users'
+const SESSION_KEY = 'silverlink-current-user'
+
+const defaultUsers = [
+  {
+    id: 'user-admin',
+    name: 'SilverLink Admin',
+    email: 'admin@silverlink.test',
+    password: 'AdminPass123',
+    role: 'admin',
+    phone: '0391234000',
+    preferences: 'High contrast dashboard and clear member records.'
+  }
+]
 
 const selectedCategory = ref('All')
 const serviceSearch = ref('')
 const savedPlan = ref(loadSavedPlan())
+const users = ref(loadUsers())
+const currentUserId = ref(localStorage.getItem(SESSION_KEY) || '')
 const successMessage = ref('')
+const authMessage = ref('')
 const errors = reactive({})
+const authErrors = reactive({})
+
+const loginForm = reactive({
+  email: '',
+  password: ''
+})
+
+const registerForm = reactive({
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: ''
+})
+
+const accountForm = reactive({
+  name: '',
+  phone: '',
+  preferences: ''
+})
 
 const registration = reactive({
   eventId: '',
@@ -323,6 +579,9 @@ const registration = reactive({
 })
 
 const totalListings = computed(() => services.length + events.length)
+const currentUser = computed(() => users.value.find((user) => user.id === currentUserId.value))
+const isAdmin = computed(() => currentUser.value?.role === 'admin')
+const memberCount = computed(() => users.value.filter((user) => user.role === 'member').length)
 
 const filteredServices = computed(() => {
   const query = serviceSearch.value.toLowerCase()
@@ -348,6 +607,39 @@ watch(
   { deep: true }
 )
 
+watch(
+  users,
+  (items) => {
+    localStorage.setItem(USERS_KEY, JSON.stringify(items))
+  },
+  { deep: true }
+)
+
+watch(currentUserId, (userId) => {
+  if (userId) {
+    localStorage.setItem(SESSION_KEY, userId)
+  } else {
+    localStorage.removeItem(SESSION_KEY)
+  }
+})
+
+watch(
+  currentUser,
+  (user) => {
+    if (!user) {
+      accountForm.name = ''
+      accountForm.phone = ''
+      accountForm.preferences = ''
+      return
+    }
+
+    accountForm.name = user.name
+    accountForm.phone = user.phone || ''
+    accountForm.preferences = user.preferences || ''
+  },
+  { immediate: true }
+)
+
 function loadSavedPlan() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -357,16 +649,34 @@ function loadSavedPlan() {
   }
 }
 
+function loadUsers() {
+  try {
+    const stored = localStorage.getItem(USERS_KEY)
+    const parsed = stored ? JSON.parse(stored) : []
+    const hasAdmin = parsed.some((user) => user.role === 'admin')
+    return hasAdmin ? parsed : [...defaultUsers, ...parsed]
+  } catch {
+    return [...defaultUsers]
+  }
+}
+
 function chooseEvent(eventId) {
   registration.eventId = eventId
 }
 
 function saveItem(item, type) {
+  if (!currentUser.value) {
+    authMessage.value = 'Please sign in before saving items to My Plan.'
+    document.getElementById('account')?.scrollIntoView({ behavior: 'smooth' })
+    return
+  }
+
   const savedId = `${type}-${item.id}`
   const alreadySaved = savedPlan.value.some((saved) => saved.savedId === savedId)
 
   if (!alreadySaved) {
     savedPlan.value.push({ ...item, type, savedId })
+    authMessage.value = `${item.name || item.title} has been saved to My Plan.`
   }
 }
 
@@ -376,6 +686,13 @@ function removeSavedItem(savedId) {
 
 function submitRegistration() {
   clearErrors()
+
+  if (!currentUser.value) {
+    successMessage.value = ''
+    authMessage.value = 'Please sign in before registering for an activity.'
+    document.getElementById('account')?.scrollIntoView({ behavior: 'smooth' })
+    return
+  }
 
   if (!registration.eventId) {
     errors.eventId = 'Please choose an activity.'
@@ -412,14 +729,143 @@ function submitRegistration() {
   registration.supportNeeds = ''
 }
 
+function login() {
+  clearAuthErrors()
+  const email = normaliseEmail(loginForm.email)
+
+  if (!email) {
+    authErrors.loginEmail = 'Email is required.'
+  } else if (!isValidEmail(email)) {
+    authErrors.loginEmail = 'Enter a valid email address.'
+  }
+
+  if (!loginForm.password) {
+    authErrors.loginPassword = 'Password is required.'
+  }
+
+  if (Object.keys(authErrors).length > 0) {
+    authMessage.value = ''
+    return
+  }
+
+  const user = users.value.find(
+    (item) => item.email === email && item.password === loginForm.password
+  )
+
+  if (!user) {
+    authErrors.loginPassword = 'Email or password is incorrect.'
+    authMessage.value = ''
+    return
+  }
+
+  currentUserId.value = user.id
+  loginForm.email = ''
+  loginForm.password = ''
+  authMessage.value = `Welcome back, ${user.name}.`
+}
+
+function registerUser() {
+  clearAuthErrors()
+  const email = normaliseEmail(registerForm.email)
+
+  if (!registerForm.name) {
+    authErrors.registerName = 'Full name is required.'
+  }
+
+  if (!email) {
+    authErrors.registerEmail = 'Email is required.'
+  } else if (!isValidEmail(email)) {
+    authErrors.registerEmail = 'Enter a valid email address.'
+  } else if (users.value.some((user) => user.email === email)) {
+    authErrors.registerEmail = 'An account already uses this email.'
+  }
+
+  if (!registerForm.password) {
+    authErrors.registerPassword = 'Password is required.'
+  } else if (registerForm.password.length < 8) {
+    authErrors.registerPassword = 'Password must be at least 8 characters.'
+  }
+
+  if (!registerForm.confirmPassword) {
+    authErrors.confirmPassword = 'Please confirm your password.'
+  } else if (registerForm.password !== registerForm.confirmPassword) {
+    authErrors.confirmPassword = 'Passwords do not match.'
+  }
+
+  if (Object.keys(authErrors).length > 0) {
+    authMessage.value = ''
+    return
+  }
+
+  const newUser = {
+    id: `user-${Date.now()}`,
+    name: sanitizeText(registerForm.name),
+    email,
+    password: registerForm.password,
+    role: 'member',
+    phone: '',
+    preferences: ''
+  }
+
+  users.value.push(newUser)
+  currentUserId.value = newUser.id
+  registerForm.name = ''
+  registerForm.email = ''
+  registerForm.password = ''
+  registerForm.confirmPassword = ''
+  authMessage.value = 'Your member account has been created.'
+}
+
+function updateAccount() {
+  clearAuthErrors()
+
+  if (!accountForm.name) {
+    authErrors.accountName = 'Display name is required.'
+    authMessage.value = ''
+    return
+  }
+
+  users.value = users.value.map((user) =>
+    user.id === currentUserId.value
+      ? {
+          ...user,
+          name: sanitizeText(accountForm.name),
+          phone: sanitizeText(accountForm.phone),
+          preferences: sanitizeText(accountForm.preferences)
+        }
+      : user
+  )
+  authMessage.value = 'Account details updated.'
+}
+
+function logout() {
+  currentUserId.value = ''
+  successMessage.value = ''
+  authMessage.value = 'You have been logged out.'
+}
+
 function clearErrors() {
   Object.keys(errors).forEach((key) => {
     delete errors[key]
   })
 }
 
+function clearAuthErrors() {
+  Object.keys(authErrors).forEach((key) => {
+    delete authErrors[key]
+  })
+}
+
 function sanitizeText(value) {
   return value.replace(/[<>]/g, '')
+}
+
+function normaliseEmail(value) {
+  return value.trim().toLowerCase()
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 function formatDate(value) {
