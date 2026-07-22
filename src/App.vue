@@ -14,6 +14,7 @@
           <a href="#activities">Activities</a>
           <a href="#plan">My Plan</a>
           <a href="#account">Account</a>
+          <a href="#ratings">Ratings</a>
           <a v-if="isAdmin" href="#admin">Admin</a>
           <a href="#contact">Contact</a>
         </div>
@@ -107,8 +108,8 @@
           <p class="eyebrow">Account Access</p>
           <h2 id="account-title">Sign in to save, register and manage details</h2>
           <p>
-            SilverLink now includes the first half of Category C: local account
-            registration, login, profile management and role-based access.
+            SilverLink includes Category C account registration, login, profile
+            management and role-based access with safer local demo storage.
           </p>
         </div>
 
@@ -294,6 +295,42 @@
             <div class="chip-row" aria-label="Accessibility features">
               <span v-for="item in service.accessibility" :key="item">{{ item }}</span>
             </div>
+            <div class="rating-summary" aria-label="Service rating summary">
+              <strong>{{ getAverageRating('service', service.id) }}</strong>
+              <span>{{ getRatingCount('service', service.id) }} ratings</span>
+            </div>
+            <form
+              v-if="currentUser"
+              class="rating-form"
+              novalidate
+              @submit.prevent="submitRating(service, 'service')"
+            >
+              <label>
+                <span>Rate this service</span>
+                <select
+                  v-model.number="ratingForms[getRatingKey('service', service.id)].score"
+                  :aria-invalid="Boolean(ratingErrors[getRatingKey('service', service.id)])"
+                >
+                  <option value="0">Choose rating</option>
+                  <option v-for="score in ratingScale" :key="score" :value="score">
+                    {{ score }} out of 5
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>Optional comment</span>
+                <input
+                  v-model.trim="ratingForms[getRatingKey('service', service.id)].comment"
+                  type="text"
+                  maxlength="180"
+                  placeholder="Short feedback"
+                />
+              </label>
+              <small v-if="ratingErrors[getRatingKey('service', service.id)]" class="error">
+                {{ ratingErrors[getRatingKey('service', service.id)] }}
+              </small>
+              <button class="button compact ghost" type="submit">Submit rating</button>
+            </form>
             <button class="button compact" type="button" @click="saveItem(service, 'service')">
               Save to My Plan
             </button>
@@ -331,6 +368,42 @@
                 <div class="chip-row">
                   <span v-for="item in event.accessibility" :key="item">{{ item }}</span>
                 </div>
+                <div class="rating-summary" aria-label="Activity rating summary">
+                  <strong>{{ getAverageRating('event', event.id) }}</strong>
+                  <span>{{ getRatingCount('event', event.id) }} ratings</span>
+                </div>
+                <form
+                  v-if="currentUser"
+                  class="rating-form inline"
+                  novalidate
+                  @submit.prevent="submitRating(event, 'event')"
+                >
+                  <label>
+                    <span>Rate this activity</span>
+                    <select
+                      v-model.number="ratingForms[getRatingKey('event', event.id)].score"
+                      :aria-invalid="Boolean(ratingErrors[getRatingKey('event', event.id)])"
+                    >
+                      <option value="0">Choose rating</option>
+                      <option v-for="score in ratingScale" :key="score" :value="score">
+                        {{ score }} out of 5
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Optional comment</span>
+                    <input
+                      v-model.trim="ratingForms[getRatingKey('event', event.id)].comment"
+                      type="text"
+                      maxlength="180"
+                      placeholder="Short feedback"
+                    />
+                  </label>
+                  <small v-if="ratingErrors[getRatingKey('event', event.id)]" class="error">
+                    {{ ratingErrors[getRatingKey('event', event.id)] }}
+                  </small>
+                  <button class="button compact ghost" type="submit">Submit rating</button>
+                </form>
               </div>
               <div class="event-actions">
                 <button class="button compact" type="button" @click="chooseEvent(event.id)">
@@ -440,6 +513,26 @@
         <p v-else class="empty-state">No saved items yet. Save a service or activity to build a simple plan.</p>
       </section>
 
+      <section id="ratings" class="section ratings-section" aria-labelledby="ratings-title">
+        <div class="section-heading">
+          <p class="eyebrow">Ratings</p>
+          <h2 id="ratings-title">Community feedback summary</h2>
+          <p>
+            Members can rate a specific service or activity. SilverLink calculates
+            and displays the average score for each item.
+          </p>
+        </div>
+
+        <div class="rating-overview">
+          <article v-for="summary in ratingSummaries" :key="summary.key" class="rating-overview-card">
+            <span class="tag">{{ summary.type }}</span>
+            <h3>{{ summary.name }}</h3>
+            <strong>{{ summary.average }}</strong>
+            <p>{{ summary.count }} ratings submitted</p>
+          </article>
+        </div>
+      </section>
+
       <section id="admin" class="section admin-section" aria-labelledby="admin-title">
         <div class="section-heading">
           <p class="eyebrow">Admin Access</p>
@@ -467,6 +560,10 @@
             <strong>{{ savedPlan.length }}</strong>
             <span>saved plan items</span>
           </article>
+          <article class="metric-card">
+            <strong>{{ ratings.length }}</strong>
+            <span>submitted ratings</span>
+          </article>
 
           <div class="admin-table-wrap">
             <table class="admin-table">
@@ -487,6 +584,33 @@
                   <td>{{ user.email }}</td>
                   <td>{{ user.role }}</td>
                   <td>{{ user.phone || 'Not provided' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <caption>
+                Recent ratings
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Score</th>
+                  <th scope="col">Comment</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="rating in ratings" :key="rating.id">
+                  <td>{{ getTargetName(rating.targetType, rating.targetId) }}</td>
+                  <td>{{ rating.targetType }}</td>
+                  <td>{{ rating.score }} / 5</td>
+                  <td>{{ rating.comment || 'No comment' }}</td>
+                </tr>
+                <tr v-if="ratings.length === 0">
+                  <td colspan="4">No ratings submitted yet.</td>
                 </tr>
               </tbody>
             </table>
@@ -523,34 +647,39 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { events, serviceCategories, services } from './data/silverlinkData'
 
 const STORAGE_KEY = 'silverlink-saved-plan'
 const USERS_KEY = 'silverlink-users'
 const SESSION_KEY = 'silverlink-current-user'
+const RATINGS_KEY = 'silverlink-ratings'
 
 const defaultUsers = [
   {
     id: 'user-admin',
     name: 'SilverLink Admin',
     email: 'admin@silverlink.test',
-    password: 'AdminPass123',
+    passwordHash: '790f48e3ba51e2d0762e7d4a74d4076a62cfb34d44e3dfbc43798fe9ff399602',
     role: 'admin',
     phone: '0391234000',
     preferences: 'High contrast dashboard and clear member records.'
   }
 ]
 
+const ratingScale = [1, 2, 3, 4, 5]
 const selectedCategory = ref('All')
 const serviceSearch = ref('')
 const savedPlan = ref(loadSavedPlan())
 const users = ref(loadUsers())
+const ratings = ref(loadRatings())
 const currentUserId = ref(localStorage.getItem(SESSION_KEY) || '')
 const successMessage = ref('')
 const authMessage = ref('')
 const errors = reactive({})
 const authErrors = reactive({})
+const ratingErrors = reactive({})
+const ratingForms = reactive(createRatingForms())
 
 const loginForm = reactive({
   email: '',
@@ -582,6 +711,22 @@ const totalListings = computed(() => services.length + events.length)
 const currentUser = computed(() => users.value.find((user) => user.id === currentUserId.value))
 const isAdmin = computed(() => currentUser.value?.role === 'admin')
 const memberCount = computed(() => users.value.filter((user) => user.role === 'member').length)
+const ratingSummaries = computed(() => [
+  ...services.map((service) => ({
+    key: getRatingKey('service', service.id),
+    type: 'service',
+    name: service.name,
+    average: getAverageRating('service', service.id),
+    count: getRatingCount('service', service.id)
+  })),
+  ...events.map((event) => ({
+    key: getRatingKey('event', event.id),
+    type: 'activity',
+    name: event.title,
+    average: getAverageRating('event', event.id),
+    count: getRatingCount('event', event.id)
+  }))
+])
 
 const filteredServices = computed(() => {
   const query = serviceSearch.value.toLowerCase()
@@ -615,6 +760,14 @@ watch(
   { deep: true }
 )
 
+watch(
+  ratings,
+  (items) => {
+    localStorage.setItem(RATINGS_KEY, JSON.stringify(items))
+  },
+  { deep: true }
+)
+
 watch(currentUserId, (userId) => {
   if (userId) {
     localStorage.setItem(SESSION_KEY, userId)
@@ -640,10 +793,17 @@ watch(
   { immediate: true }
 )
 
+onMounted(async () => {
+  await migrateLegacyPasswords()
+  migrateStoredRatings()
+  syncCurrentUser()
+})
+
 function loadSavedPlan() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    return stored ? JSON.parse(stored) : []
+    const parsed = stored ? JSON.parse(stored) : []
+    return Array.isArray(parsed) ? parsed.map(sanitiseSavedItem).filter(Boolean) : []
   } catch {
     return []
   }
@@ -653,11 +813,138 @@ function loadUsers() {
   try {
     const stored = localStorage.getItem(USERS_KEY)
     const parsed = stored ? JSON.parse(stored) : []
-    const hasAdmin = parsed.some((user) => user.role === 'admin')
-    return hasAdmin ? parsed : [...defaultUsers, ...parsed]
+    const cleanUsers = Array.isArray(parsed) ? parsed.map(sanitiseUser).filter(Boolean) : []
+    const admin = defaultUsers[0]
+    const hasAdmin = cleanUsers.some((user) => user.id === admin.id)
+    return hasAdmin
+      ? cleanUsers.map((user) =>
+          user.id === admin.id
+            ? { ...admin, ...user, passwordHash: user.passwordHash || admin.passwordHash, role: 'admin' }
+            : user
+        )
+      : [admin, ...cleanUsers]
   } catch {
     return [...defaultUsers]
   }
+}
+
+function loadRatings() {
+  try {
+    const stored = localStorage.getItem(RATINGS_KEY)
+    const parsed = stored ? JSON.parse(stored) : []
+    return Array.isArray(parsed) ? parsed.map(sanitiseRating).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+function createRatingForms() {
+  const forms = {}
+
+  services.forEach((service) => {
+    forms[getRatingKey('service', service.id)] = { score: 0, comment: '' }
+  })
+
+  events.forEach((event) => {
+    forms[getRatingKey('event', event.id)] = { score: 0, comment: '' }
+  })
+
+  return forms
+}
+
+function sanitiseSavedItem(item) {
+  if (!item || typeof item.savedId !== 'string' || typeof item.type !== 'string') {
+    return null
+  }
+
+  return {
+    ...item,
+    savedId: sanitizeText(item.savedId),
+    type: item.type === 'event' ? 'event' : 'service',
+    name: sanitizeText(item.name || ''),
+    title: sanitizeText(item.title || ''),
+    summary: sanitizeText(item.summary || ''),
+    description: sanitizeText(item.description || '')
+  }
+}
+
+function sanitiseUser(user) {
+  if (!user || typeof user.email !== 'string' || typeof user.id !== 'string') {
+    return null
+  }
+
+  return {
+    id: sanitizeText(user.id),
+    name: sanitizeText(user.name || 'SilverLink member'),
+    email: normaliseEmail(user.email),
+    passwordHash: sanitizeText(user.passwordHash || ''),
+    password: typeof user.password === 'string' ? user.password : undefined,
+    role: user.role === 'admin' ? 'admin' : 'member',
+    phone: sanitizeText(user.phone || ''),
+    preferences: sanitizeText(user.preferences || '')
+  }
+}
+
+function sanitiseRating(rating) {
+  if (
+    !rating ||
+    !['service', 'event'].includes(rating.targetType) ||
+    typeof rating.targetId !== 'string' ||
+    typeof rating.userId !== 'string'
+  ) {
+    return null
+  }
+
+  const score = Number(rating.score)
+
+  if (!Number.isInteger(score) || score < 1 || score > 5) {
+    return null
+  }
+
+  return {
+    id: sanitizeText(rating.id || `rating-${Date.now()}`),
+    targetType: rating.targetType,
+    targetId: sanitizeText(rating.targetId),
+    userId: sanitizeText(rating.userId),
+    score,
+    comment: sanitizeReviewComment(rating.comment || '').slice(0, 180),
+    createdAt: sanitizeText(rating.createdAt || new Date().toISOString())
+  }
+}
+
+async function migrateLegacyPasswords() {
+  let changed = false
+  const migrated = []
+
+  for (const user of users.value) {
+    if (user.password && !user.passwordHash) {
+      migrated.push({
+        ...user,
+        passwordHash: await hashPassword(user.password),
+        password: undefined
+      })
+      changed = true
+    } else if (user.password) {
+      migrated.push({ ...user, password: undefined })
+      changed = true
+    } else {
+      migrated.push(user)
+    }
+  }
+
+  if (changed) {
+    users.value = migrated
+  }
+}
+
+function syncCurrentUser() {
+  if (currentUserId.value && !currentUser.value) {
+    currentUserId.value = ''
+  }
+}
+
+function migrateStoredRatings() {
+  ratings.value = ratings.value.map((rating) => sanitiseRating(rating)).filter(Boolean)
 }
 
 function chooseEvent(eventId) {
@@ -720,7 +1007,7 @@ function submitRegistration() {
   }
 
   const selectedEvent = events.find((event) => event.id === registration.eventId)
-  successMessage.value = `Thanks ${sanitizeText(registration.name)}. Your interest in ${selectedEvent.title} has been recorded.`
+  successMessage.value = `Thanks ${sanitizeText(registration.name)}. Your interest in ${sanitizeText(selectedEvent.title)} has been recorded.`
 
   registration.eventId = ''
   registration.name = ''
@@ -729,7 +1016,7 @@ function submitRegistration() {
   registration.supportNeeds = ''
 }
 
-function login() {
+async function login() {
   clearAuthErrors()
   const email = normaliseEmail(loginForm.email)
 
@@ -748,14 +1035,23 @@ function login() {
     return
   }
 
-  const user = users.value.find(
-    (item) => item.email === email && item.password === loginForm.password
-  )
+  const enteredHash = await hashPassword(loginForm.password)
+  const user = users.value.find((item) => {
+    const hashMatches = item.passwordHash === enteredHash
+    const legacyMatches = item.password === loginForm.password
+    return item.email === email && (hashMatches || legacyMatches)
+  })
 
   if (!user) {
     authErrors.loginPassword = 'Email or password is incorrect.'
     authMessage.value = ''
     return
+  }
+
+  if (user.password) {
+    users.value = users.value.map((item) =>
+      item.id === user.id ? { ...item, passwordHash: enteredHash, password: undefined } : item
+    )
   }
 
   currentUserId.value = user.id
@@ -764,7 +1060,7 @@ function login() {
   authMessage.value = `Welcome back, ${user.name}.`
 }
 
-function registerUser() {
+async function registerUser() {
   clearAuthErrors()
   const email = normaliseEmail(registerForm.email)
 
@@ -801,7 +1097,7 @@ function registerUser() {
     id: `user-${Date.now()}`,
     name: sanitizeText(registerForm.name),
     email,
-    password: registerForm.password,
+    passwordHash: await hashPassword(registerForm.password),
     role: 'member',
     phone: '',
     preferences: ''
@@ -814,6 +1110,86 @@ function registerUser() {
   registerForm.password = ''
   registerForm.confirmPassword = ''
   authMessage.value = 'Your member account has been created.'
+}
+
+function submitRating(item, type) {
+  if (!currentUser.value) {
+    authMessage.value = 'Please sign in before submitting a rating.'
+    document.getElementById('account')?.scrollIntoView({ behavior: 'smooth' })
+    return
+  }
+
+  const key = getRatingKey(type, item.id)
+  clearRatingError(key)
+  const form = ratingForms[key]
+
+  if (!form || !Number.isInteger(form.score) || form.score < 1 || form.score > 5) {
+    ratingErrors[key] = 'Choose a rating from 1 to 5.'
+    return
+  }
+
+  const cleanComment = sanitizeReviewComment(form.comment || '').slice(0, 180)
+  const existingIndex = ratings.value.findIndex(
+    (rating) =>
+      rating.targetType === type &&
+      rating.targetId === item.id &&
+      rating.userId === currentUser.value.id
+  )
+  const nextRating = {
+    id:
+      existingIndex >= 0
+        ? ratings.value[existingIndex].id
+        : `rating-${type}-${item.id}-${currentUser.value.id}`,
+    targetType: type,
+    targetId: item.id,
+    userId: currentUser.value.id,
+    score: form.score,
+    comment: cleanComment,
+    createdAt: new Date().toISOString()
+  }
+
+  if (existingIndex >= 0) {
+    ratings.value = ratings.value.map((rating, index) =>
+      index === existingIndex ? nextRating : rating
+    )
+  } else {
+    ratings.value.push(nextRating)
+  }
+
+  form.score = 0
+  form.comment = ''
+  authMessage.value = `Your rating for ${sanitizeText(item.name || item.title)} has been saved.`
+}
+
+function getRatingKey(type, id) {
+  return `${type}-${id}`
+}
+
+function getRatingsForTarget(type, id) {
+  return ratings.value.filter((rating) => rating.targetType === type && rating.targetId === id)
+}
+
+function getRatingCount(type, id) {
+  return getRatingsForTarget(type, id).length
+}
+
+function getAverageRating(type, id) {
+  const targetRatings = getRatingsForTarget(type, id)
+
+  if (targetRatings.length === 0) {
+    return 'No rating'
+  }
+
+  const total = targetRatings.reduce((sum, rating) => sum + rating.score, 0)
+  return `${(total / targetRatings.length).toFixed(1)} / 5`
+}
+
+function getTargetName(type, id) {
+  if (type === 'service') {
+    return services.find((service) => service.id === id)?.name || 'Unknown service'
+  }
+
+  return events.find((event) => event.id === id)?.title || 'Unknown activity'
 }
 
 function updateAccount() {
@@ -856,8 +1232,28 @@ function clearAuthErrors() {
   })
 }
 
+function clearRatingError(key) {
+  if (ratingErrors[key]) {
+    delete ratingErrors[key]
+  }
+}
+
 function sanitizeText(value) {
-  return value.replace(/[<>]/g, '')
+  return String(value)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/<\/?[^>]+>/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/[<>]/g, '')
+    .trim()
+}
+
+function sanitizeReviewComment(value) {
+  return sanitizeText(value)
+    .replace(/\/?script/gi, '')
+    .replace(/\balert\s*\([^)]*\)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function normaliseEmail(value) {
@@ -866,6 +1262,14 @@ function normaliseEmail(value) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+async function hashPassword(value) {
+  const data = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 function formatDate(value) {
