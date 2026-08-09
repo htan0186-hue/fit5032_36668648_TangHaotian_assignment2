@@ -1,5 +1,6 @@
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'large-text': accessibility.largeText, 'high-contrast': accessibility.highContrast }">
+    <a class="skip-link" href="#top">Skip to main content</a>
     <header class="site-header">
       <nav class="nav-bar" aria-label="Main navigation">
         <a class="brand" href="#top" aria-label="SilverLink home">
@@ -15,6 +16,9 @@
           <a href="#plan">My Plan</a>
           <a href="#account">Account</a>
           <a href="#ratings">Ratings</a>
+          <a href="#advanced">A3 Tools</a>
+          <a href="#map">Map</a>
+          <a href="#innovation">Innovation</a>
           <a v-if="isAdmin" href="#admin">Admin</a>
           <a href="#contact">Contact</a>
         </div>
@@ -195,6 +199,41 @@
             </label>
             <button class="button primary full" type="submit">Create account</button>
           </form>
+
+          <article class="form-panel auth-card external-auth-card">
+            <h3>External authentication</h3>
+            <p class="muted">
+              Firebase Authentication REST integration for A3 BR D.1. Add
+              <code>VITE_FIREBASE_API_KEY</code> in `.env` to enable the external provider.
+            </p>
+            <label>
+              <span>Firebase email</span>
+              <input
+                v-model.trim="externalAuthForm.email"
+                type="email"
+                autocomplete="email"
+                :aria-invalid="Boolean(authErrors.externalEmail)"
+              />
+              <small v-if="authErrors.externalEmail" class="error">
+                {{ authErrors.externalEmail }}
+              </small>
+            </label>
+            <label>
+              <span>Firebase password</span>
+              <input
+                v-model="externalAuthForm.password"
+                type="password"
+                autocomplete="current-password"
+                :aria-invalid="Boolean(authErrors.externalPassword)"
+              />
+              <small v-if="authErrors.externalPassword" class="error">
+                {{ authErrors.externalPassword }}
+              </small>
+            </label>
+            <button class="button secondary full" type="button" @click="externalFirebaseLogin">
+              Continue with Firebase Auth
+            </button>
+          </article>
         </div>
 
         <div v-else class="account-dashboard">
@@ -533,6 +572,356 @@
         </div>
       </section>
 
+      <section id="advanced" class="section advanced-section" aria-labelledby="advanced-title">
+        <div class="section-heading">
+          <p class="eyebrow">A3 Advanced Web Application</p>
+          <h2 id="advanced-title">Interactive tables, email, serverless and export tools</h2>
+          <p>
+            These tools cover BR D and E with searchable tables, serverless email
+            handling, CSV/PDF-style exports and deployment-ready Netlify functions.
+          </p>
+        </div>
+
+        <div class="advanced-grid">
+          <article class="tool-panel">
+            <h3>Service directory table</h3>
+            <div class="table-controls" aria-label="Service table controls">
+              <label>
+                <span>Global search</span>
+                <input v-model.trim="serviceTable.search" type="search" placeholder="Search services" />
+              </label>
+              <label>
+                <span>Category filter</span>
+                <select v-model="serviceTable.category">
+                  <option value="">All categories</option>
+                  <option v-for="category in serviceCategories" :key="category" :value="category">
+                    {{ category }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>Suburb filter</span>
+                <input v-model.trim="serviceTable.suburb" type="search" placeholder="Column search" />
+              </label>
+            </div>
+            <div class="admin-table-wrap interactive-table-wrap">
+              <table class="admin-table interactive-table">
+                <caption>
+                  Services table with sorting, search, column search and pagination
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">
+                      <button type="button" class="sort-button" @click="sortTable(serviceTable, 'name')">
+                        Service {{ getSortMark(serviceTable, 'name') }}
+                      </button>
+                    </th>
+                    <th scope="col">
+                      <button type="button" class="sort-button" @click="sortTable(serviceTable, 'category')">
+                        Category {{ getSortMark(serviceTable, 'category') }}
+                      </button>
+                    </th>
+                    <th scope="col">
+                      <button type="button" class="sort-button" @click="sortTable(serviceTable, 'suburb')">
+                        Suburb {{ getSortMark(serviceTable, 'suburb') }}
+                      </button>
+                    </th>
+                    <th scope="col">Cost</th>
+                    <th scope="col">Verified</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in pagedServiceRows" :key="row.id">
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.category }}</td>
+                    <td>{{ row.suburb }}</td>
+                    <td>{{ row.cost }}</td>
+                    <td>{{ row.verifiedDate }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination-bar" aria-label="Service table pagination">
+              <button class="button compact ghost" type="button" @click="previousPage(serviceTable)" :disabled="serviceTable.page === 1">
+                Previous
+              </button>
+              <span>Page {{ serviceTable.page }} of {{ servicePageCount }}</span>
+              <button class="button compact ghost" type="button" @click="nextPage(serviceTable, servicePageCount)" :disabled="serviceTable.page === servicePageCount">
+                Next
+              </button>
+            </div>
+          </article>
+
+          <article class="tool-panel">
+            <h3>Activity registration table</h3>
+            <div class="table-controls" aria-label="Activity table controls">
+              <label>
+                <span>Global search</span>
+                <input v-model.trim="activityTable.search" type="search" placeholder="Search activities" />
+              </label>
+              <label>
+                <span>Category filter</span>
+                <select v-model="activityTable.category">
+                  <option value="">All categories</option>
+                  <option v-for="category in activityCategories" :key="category" :value="category">
+                    {{ category }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>Location filter</span>
+                <input v-model.trim="activityTable.location" type="search" placeholder="Column search" />
+              </label>
+            </div>
+            <div class="admin-table-wrap interactive-table-wrap">
+              <table class="admin-table interactive-table">
+                <caption>
+                  Activities table with sorting, search, column search and pagination
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">
+                      <button type="button" class="sort-button" @click="sortTable(activityTable, 'title')">
+                        Activity {{ getSortMark(activityTable, 'title') }}
+                      </button>
+                    </th>
+                    <th scope="col">
+                      <button type="button" class="sort-button" @click="sortTable(activityTable, 'category')">
+                        Category {{ getSortMark(activityTable, 'category') }}
+                      </button>
+                    </th>
+                    <th scope="col">
+                      <button type="button" class="sort-button" @click="sortTable(activityTable, 'date')">
+                        Date {{ getSortMark(activityTable, 'date') }}
+                      </button>
+                    </th>
+                    <th scope="col">Location</th>
+                    <th scope="col">Places</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in pagedActivityRows" :key="row.id">
+                    <td>{{ row.title }}</td>
+                    <td>{{ row.category }}</td>
+                    <td>{{ row.date }}</td>
+                    <td>{{ row.location }}</td>
+                    <td>{{ row.places }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination-bar" aria-label="Activity table pagination">
+              <button class="button compact ghost" type="button" @click="previousPage(activityTable)" :disabled="activityTable.page === 1">
+                Previous
+              </button>
+              <span>Page {{ activityTable.page }} of {{ activityPageCount }}</span>
+              <button class="button compact ghost" type="button" @click="nextPage(activityTable, activityPageCount)" :disabled="activityTable.page === activityPageCount">
+                Next
+              </button>
+            </div>
+          </article>
+        </div>
+
+        <div class="advanced-grid">
+          <form class="tool-panel" novalidate @submit.prevent="sendEmailWithAttachment">
+            <h3>Email with attachment</h3>
+            <p class="muted">
+              Uses a Netlify serverless function. Without an email API key, the function
+              validates and returns a safe demo response for recording.
+            </p>
+            <label>
+              <span>Recipient email *</span>
+              <input v-model.trim="emailForm.to" type="email" :aria-invalid="Boolean(advancedErrors.emailTo)" />
+              <small v-if="advancedErrors.emailTo" class="error">{{ advancedErrors.emailTo }}</small>
+            </label>
+            <label>
+              <span>Subject *</span>
+              <input v-model.trim="emailForm.subject" type="text" />
+            </label>
+            <label>
+              <span>Message *</span>
+              <textarea v-model.trim="emailForm.message" rows="4"></textarea>
+            </label>
+            <label>
+              <span>Attachment</span>
+              <input type="file" @change="handleAttachment" />
+            </label>
+            <button class="button primary full" type="submit">Send email request</button>
+            <p v-if="advancedMessage" class="success" role="status">{{ advancedMessage }}</p>
+          </form>
+
+          <article class="tool-panel">
+            <h3>Data export and serverless check</h3>
+            <p class="muted">
+              Export app data to CSV or open a print-ready report for PDF saving.
+              The CSV export also has a matching serverless function.
+            </p>
+            <div class="export-actions">
+              <button class="button primary" type="button" @click="exportCsv">Export CSV</button>
+              <button class="button secondary" type="button" @click="openPrintableReport">Open PDF report</button>
+              <button class="button secondary" type="button" @click="callServerlessExport">Test serverless export</button>
+            </div>
+            <p class="muted">{{ serverlessStatus }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="map" class="section map-section" aria-labelledby="map-title">
+        <div class="section-heading">
+          <p class="eyebrow">Map And Location</p>
+          <h2 id="map-title">Find nearby SilverLink support</h2>
+          <p>
+            The map supports category filtering, marker selection, user-location
+            simulation and distance calculation for real service and activity points.
+          </p>
+        </div>
+
+        <div class="map-layout">
+          <div class="map-panel" aria-label="SilverLink location map">
+            <button
+              v-for="location in filteredMapLocations"
+              :key="location.id"
+              class="map-marker"
+              type="button"
+              :class="{ active: selectedMapLocation?.id === location.id }"
+              :style="getMarkerStyle(location)"
+              @click="selectMapLocation(location)"
+            >
+              <span>{{ location.type === 'service' ? 'S' : 'A' }}</span>
+            </button>
+          </div>
+          <aside class="tool-panel map-details">
+            <label>
+              <span>Search map</span>
+              <input v-model.trim="mapSearch" type="search" placeholder="Search name or suburb" />
+            </label>
+            <label>
+              <span>Category</span>
+              <select v-model="mapCategory">
+                <option value="">All categories</option>
+                <option v-for="category in mapCategories" :key="category" :value="category">
+                  {{ category }}
+                </option>
+              </select>
+            </label>
+            <label>
+              <span>Your current area</span>
+              <select v-model="userArea">
+                <option v-for="area in userAreas" :key="area.name" :value="area.name">
+                  {{ area.name }}
+                </option>
+              </select>
+            </label>
+            <div v-if="selectedMapLocation" class="selected-location">
+              <span class="tag">{{ selectedMapLocation.type }}</span>
+              <h3>{{ selectedMapLocation.name }}</h3>
+              <p>{{ selectedMapLocation.suburb || selectedMapLocation.location }}</p>
+              <strong>{{ selectedDistance }} km from {{ userArea }}</strong>
+            </div>
+            <div class="nearest-list">
+              <h3>Nearest options</h3>
+              <ol>
+                <li v-for="location in nearestLocations" :key="location.id">
+                  {{ location.name }} - {{ getDistanceFromUser(location).toFixed(1) }} km
+                </li>
+              </ol>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="innovation" class="section innovation-section" aria-labelledby="innovation-title">
+        <div class="section-heading">
+          <p class="eyebrow">Innovation Features F.1</p>
+          <h2 id="innovation-title">Four UX improvements for SilverLink</h2>
+          <p>
+            Selected F.1 features: admin dashboard, interactive charts, booking
+            calendar, offline support, and a smart recommendation assistant.
+          </p>
+        </div>
+
+        <div class="innovation-grid">
+          <article class="tool-panel">
+            <h3>Interactive service chart</h3>
+            <div class="bar-chart" aria-label="Service category chart">
+              <div v-for="bar in categoryChartData" :key="bar.label" class="bar-row">
+                <span>{{ bar.label }}</span>
+                <div class="bar-track">
+                  <div class="bar-fill" :style="{ width: bar.percent + '%' }"></div>
+                </div>
+                <strong>{{ bar.count }}</strong>
+              </div>
+            </div>
+          </article>
+
+          <article class="tool-panel">
+            <h3>Booking calendar</h3>
+            <div class="calendar-grid" aria-label="Activity booking calendar">
+              <button
+                v-for="event in events"
+                :key="event.id"
+                class="calendar-event"
+                type="button"
+                @click="chooseEvent(event.id)"
+              >
+                <strong>{{ formatDate(event.date) }}</strong>
+                <span>{{ event.title }}</span>
+              </button>
+            </div>
+          </article>
+
+          <article class="tool-panel">
+            <h3>Offline support</h3>
+            <p>
+              Status:
+              <strong :class="isOnline ? 'online-text' : 'offline-text'">
+                {{ isOnline ? 'Online' : 'Offline' }}
+              </strong>
+            </p>
+            <label>
+              <span>Offline note draft</span>
+              <textarea v-model.trim="offlineDraft" rows="5" placeholder="Saved automatically in this browser"></textarea>
+            </label>
+          </article>
+
+          <article class="tool-panel">
+            <h3>Accessibility controls</h3>
+            <label class="toggle-row">
+              <input v-model="accessibility.largeText" type="checkbox" />
+              <span>Use larger text</span>
+            </label>
+            <label class="toggle-row">
+              <input v-model="accessibility.highContrast" type="checkbox" />
+              <span>Use high contrast mode</span>
+            </label>
+            <p class="muted">
+              Supports WCAG-oriented usability with keyboard focus, labelled controls
+              and user-controlled visual preferences.
+            </p>
+          </article>
+
+          <article class="tool-panel">
+            <h3>Smart recommendation assistant</h3>
+            <label>
+              <span>What do you need help with?</span>
+              <select v-model="recommendationNeed">
+                <option value="transport">Transport to appointments</option>
+                <option value="digital">Technology confidence</option>
+                <option value="social">Social connection</option>
+                <option value="home">Home assistance</option>
+              </select>
+            </label>
+            <div class="recommendation-result">
+              <strong>{{ recommendedItem?.name }}</strong>
+              <p>{{ recommendedItem?.summary }}</p>
+              <button class="button compact" type="button" @click="saveItem(recommendedItem, 'service')">
+                Save recommendation
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section id="admin" class="section admin-section" aria-labelledby="admin-title">
         <div class="section-heading">
           <p class="eyebrow">Admin Access</p>
@@ -654,6 +1043,9 @@ const STORAGE_KEY = 'silverlink-saved-plan'
 const USERS_KEY = 'silverlink-users'
 const SESSION_KEY = 'silverlink-current-user'
 const RATINGS_KEY = 'silverlink-ratings'
+const OFFLINE_DRAFT_KEY = 'silverlink-offline-draft'
+const ACCESSIBILITY_KEY = 'silverlink-accessibility'
+const TABLE_PAGE_SIZE = 10
 
 const defaultUsers = [
   {
@@ -693,6 +1085,11 @@ const registerForm = reactive({
   confirmPassword: ''
 })
 
+const externalAuthForm = reactive({
+  email: '',
+  password: ''
+})
+
 const accountForm = reactive({
   name: '',
   phone: '',
@@ -706,6 +1103,50 @@ const registration = reactive({
   phone: '',
   supportNeeds: ''
 })
+
+const serviceTable = reactive({
+  search: '',
+  category: '',
+  suburb: '',
+  sortKey: 'name',
+  sortDirection: 'asc',
+  page: 1
+})
+
+const activityTable = reactive({
+  search: '',
+  category: '',
+  location: '',
+  sortKey: 'date',
+  sortDirection: 'asc',
+  page: 1
+})
+
+const emailForm = reactive({
+  to: '',
+  subject: 'SilverLink information pack',
+  message: 'Please find the attached SilverLink support information.',
+  attachment: null
+})
+
+const advancedErrors = reactive({})
+const advancedMessage = ref('')
+const serverlessStatus = ref('Serverless function not tested yet.')
+const mapSearch = ref('')
+const mapCategory = ref('')
+const userArea = ref('Clayton')
+const selectedMapLocation = ref(null)
+const isOnline = ref(navigator.onLine)
+const offlineDraft = ref(localStorage.getItem(OFFLINE_DRAFT_KEY) || '')
+const recommendationNeed = ref('transport')
+const accessibility = reactive(loadAccessibility())
+
+const userAreas = [
+  { name: 'Clayton', lat: -37.915, lng: 145.13 },
+  { name: 'Oakleigh', lat: -37.899, lng: 145.088 },
+  { name: 'Dandenong', lat: -37.987, lng: 145.215 },
+  { name: 'Glen Waverley', lat: -37.879, lng: 145.164 }
+]
 
 const totalListings = computed(() => services.length + events.length)
 const currentUser = computed(() => users.value.find((user) => user.id === currentUserId.value))
@@ -727,6 +1168,93 @@ const ratingSummaries = computed(() => [
     count: getRatingCount('event', event.id)
   }))
 ])
+const activityCategories = computed(() => [...new Set(events.map((event) => event.category))])
+const mapLocations = computed(() => [
+  ...services.map((service) => ({ ...service, type: 'service' })),
+  ...events.map((event) => ({
+    ...event,
+    type: 'activity',
+    name: event.title,
+    suburb: event.location
+  }))
+])
+const mapCategories = computed(() => [...new Set(mapLocations.value.map((location) => location.category))])
+const filteredServiceRows = computed(() => {
+  const query = serviceTable.search.toLowerCase()
+  const suburb = serviceTable.suburb.toLowerCase()
+  const rows = services.filter((service) => {
+    const globalMatch =
+      !query ||
+      [service.name, service.category, service.suburb, service.cost, service.summary]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    const categoryMatch = !serviceTable.category || service.category === serviceTable.category
+    const suburbMatch = !suburb || service.suburb.toLowerCase().includes(suburb)
+    return globalMatch && categoryMatch && suburbMatch
+  })
+
+  return sortRows(rows, serviceTable.sortKey, serviceTable.sortDirection)
+})
+const filteredActivityRows = computed(() => {
+  const query = activityTable.search.toLowerCase()
+  const location = activityTable.location.toLowerCase()
+  const rows = events.filter((event) => {
+    const globalMatch =
+      !query ||
+      [event.title, event.category, event.location, event.description]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    const categoryMatch = !activityTable.category || event.category === activityTable.category
+    const locationMatch = !location || event.location.toLowerCase().includes(location)
+    return globalMatch && categoryMatch && locationMatch
+  })
+
+  return sortRows(rows, activityTable.sortKey, activityTable.sortDirection)
+})
+const servicePageCount = computed(() => Math.max(1, Math.ceil(filteredServiceRows.value.length / TABLE_PAGE_SIZE)))
+const activityPageCount = computed(() => Math.max(1, Math.ceil(filteredActivityRows.value.length / TABLE_PAGE_SIZE)))
+const pagedServiceRows = computed(() => paginateRows(filteredServiceRows.value, serviceTable.page))
+const pagedActivityRows = computed(() => paginateRows(filteredActivityRows.value, activityTable.page))
+const filteredMapLocations = computed(() => {
+  const query = mapSearch.value.toLowerCase()
+
+  return mapLocations.value.filter((location) => {
+    const queryMatch =
+      !query ||
+      [location.name, location.suburb, location.category].join(' ').toLowerCase().includes(query)
+    const categoryMatch = !mapCategory.value || location.category === mapCategory.value
+    return queryMatch && categoryMatch
+  })
+})
+const currentUserArea = computed(() => userAreas.find((area) => area.name === userArea.value) || userAreas[0])
+const selectedDistance = computed(() =>
+  selectedMapLocation.value ? getDistanceFromUser(selectedMapLocation.value).toFixed(1) : '0.0'
+)
+const nearestLocations = computed(() =>
+  [...filteredMapLocations.value]
+    .sort((a, b) => getDistanceFromUser(a) - getDistanceFromUser(b))
+    .slice(0, 4)
+)
+const categoryChartData = computed(() => {
+  const counts = serviceCategories.map((category) => ({
+    label: category,
+    count: services.filter((service) => service.category === category).length
+  }))
+  const max = Math.max(...counts.map((item) => item.count), 1)
+  return counts.map((item) => ({ ...item, percent: Math.max(8, (item.count / max) * 100) }))
+})
+const recommendedItem = computed(() => {
+  const categoryMap = {
+    transport: 'Transport',
+    digital: 'Digital Support',
+    social: 'Social Connection',
+    home: 'Home Help'
+  }
+  const category = categoryMap[recommendationNeed.value]
+  return services.find((service) => service.category === category) || services[0]
+})
 
 const filteredServices = computed(() => {
   const query = serviceSearch.value.toLowerCase()
@@ -793,10 +1321,39 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => [serviceTable.search, serviceTable.category, serviceTable.suburb],
+  () => {
+    serviceTable.page = 1
+  }
+)
+
+watch(
+  () => [activityTable.search, activityTable.category, activityTable.location],
+  () => {
+    activityTable.page = 1
+  }
+)
+
+watch(offlineDraft, (value) => {
+  localStorage.setItem(OFFLINE_DRAFT_KEY, sanitizeText(value))
+})
+
+watch(
+  accessibility,
+  (value) => {
+    localStorage.setItem(ACCESSIBILITY_KEY, JSON.stringify(value))
+  },
+  { deep: true }
+)
+
 onMounted(async () => {
   await migrateLegacyPasswords()
   migrateStoredRatings()
   syncCurrentUser()
+  selectedMapLocation.value = filteredMapLocations.value[0] || null
+  window.addEventListener('online', updateOnlineStatus)
+  window.addEventListener('offline', updateOnlineStatus)
 })
 
 function loadSavedPlan() {
@@ -835,6 +1392,22 @@ function loadRatings() {
     return Array.isArray(parsed) ? parsed.map(sanitiseRating).filter(Boolean) : []
   } catch {
     return []
+  }
+}
+
+function loadAccessibility() {
+  try {
+    const stored = localStorage.getItem(ACCESSIBILITY_KEY)
+    const parsed = stored ? JSON.parse(stored) : {}
+    return {
+      largeText: Boolean(parsed.largeText),
+      highContrast: Boolean(parsed.highContrast)
+    }
+  } catch {
+    return {
+      largeText: false,
+      highContrast: false
+    }
   }
 }
 
@@ -945,6 +1518,298 @@ function syncCurrentUser() {
 
 function migrateStoredRatings() {
   ratings.value = ratings.value.map((rating) => sanitiseRating(rating)).filter(Boolean)
+}
+
+function sortRows(rows, key, direction) {
+  return [...rows].sort((a, b) => {
+    const left = String(a[key] ?? '').toLowerCase()
+    const right = String(b[key] ?? '').toLowerCase()
+    const result = left.localeCompare(right, undefined, { numeric: true })
+    return direction === 'asc' ? result : -result
+  })
+}
+
+function paginateRows(rows, page) {
+  const start = (page - 1) * TABLE_PAGE_SIZE
+  return rows.slice(start, start + TABLE_PAGE_SIZE)
+}
+
+function sortTable(table, key) {
+  if (table.sortKey === key) {
+    table.sortDirection = table.sortDirection === 'asc' ? 'desc' : 'asc'
+  } else {
+    table.sortKey = key
+    table.sortDirection = 'asc'
+  }
+}
+
+function getSortMark(table, key) {
+  if (table.sortKey !== key) {
+    return ''
+  }
+
+  return table.sortDirection === 'asc' ? 'up' : 'down'
+}
+
+function previousPage(table) {
+  table.page = Math.max(1, table.page - 1)
+}
+
+function nextPage(table, pageCount) {
+  table.page = Math.min(pageCount, table.page + 1)
+}
+
+async function externalFirebaseLogin() {
+  clearAuthErrors()
+  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY
+  const email = normaliseEmail(externalAuthForm.email)
+
+  if (!apiKey) {
+    authErrors.externalPassword = 'Firebase API key is not configured in .env.'
+    return
+  }
+
+  if (!email || !isValidEmail(email)) {
+    authErrors.externalEmail = 'Enter a valid Firebase email.'
+  }
+
+  if (!externalAuthForm.password || externalAuthForm.password.length < 6) {
+    authErrors.externalPassword = 'Firebase password must be at least 6 characters.'
+  }
+
+  if (Object.keys(authErrors).length > 0) {
+    return
+  }
+
+  try {
+    const response = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password: externalAuthForm.password,
+          returnSecureToken: true
+        })
+      }
+    )
+    const result = await response.json()
+
+    if (!response.ok) {
+      authErrors.externalPassword = result.error?.message || 'Firebase authentication failed.'
+      return
+    }
+
+    const existing = users.value.find((user) => user.email === email)
+    const externalUser = existing || {
+      id: `firebase-${result.localId}`,
+      name: sanitizeText(result.displayName || email.split('@')[0]),
+      email,
+      passwordHash: '',
+      role: 'member',
+      phone: '',
+      preferences: 'External Firebase account'
+    }
+
+    if (!existing) {
+      users.value.push(externalUser)
+    }
+
+    currentUserId.value = externalUser.id
+    authMessage.value = 'Signed in with Firebase Authentication.'
+    externalAuthForm.email = ''
+    externalAuthForm.password = ''
+  } catch {
+    authErrors.externalPassword = 'Unable to reach Firebase Authentication.'
+  }
+}
+
+function handleAttachment(event) {
+  const file = event.target.files?.[0]
+  emailForm.attachment = file || null
+}
+
+async function sendEmailWithAttachment() {
+  advancedErrors.emailTo = ''
+
+  if (!emailForm.to || !isValidEmail(normaliseEmail(emailForm.to))) {
+    advancedErrors.emailTo = 'Enter a valid recipient email.'
+    advancedMessage.value = ''
+    return
+  }
+
+  if (!emailForm.subject || !emailForm.message) {
+    advancedMessage.value = 'Subject and message are required.'
+    return
+  }
+
+  const attachment = emailForm.attachment ? await fileToAttachment(emailForm.attachment) : null
+  const payload = {
+    to: normaliseEmail(emailForm.to),
+    subject: sanitizeText(emailForm.subject),
+    message: sanitizeText(emailForm.message),
+    attachment
+  }
+
+  try {
+    const response = await fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    const result = await response.json()
+    advancedMessage.value = result.ok
+      ? `Email function completed using ${result.provider} mode.`
+      : result.error || 'Email function failed.'
+  } catch {
+    advancedMessage.value =
+      'Local Vite preview cannot run Netlify Functions. Payload is ready for deployed serverless email.'
+  }
+}
+
+function fileToAttachment(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      resolve({
+        filename: sanitizeText(file.name),
+        contentType: sanitizeText(file.type || 'application/octet-stream'),
+        size: file.size,
+        contentBase64: result.split(',')[1] || ''
+      })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function exportCsv() {
+  const rows = services.map((service) => ({
+    name: service.name,
+    category: service.category,
+    suburb: service.suburb,
+    cost: service.cost,
+    phone: service.phone,
+    averageRating: getAverageRating('service', service.id)
+  }))
+  downloadCsv('silverlink-services.csv', rows)
+}
+
+async function callServerlessExport() {
+  try {
+    const response = await fetch('/.netlify/functions/export-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        columns: ['name', 'category', 'suburb', 'cost'],
+        rows: services
+      })
+    })
+    serverlessStatus.value = response.ok
+      ? 'Serverless export function responded successfully.'
+      : 'Serverless export function returned an error.'
+  } catch {
+    serverlessStatus.value =
+      'Local Vite preview cannot run Netlify Functions; deploy with Netlify to test serverless export.'
+  }
+}
+
+function downloadCsv(filename, rows) {
+  const columns = Object.keys(rows[0] || {})
+  const csv = [
+    columns.join(','),
+    ...rows.map((row) =>
+      columns.map((column) => `"${String(row[column] ?? '').replaceAll('"', '""')}"`).join(',')
+    )
+  ].join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function openPrintableReport() {
+  const html = `
+    <html>
+      <head>
+        <title>SilverLink My Plan Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 32px; color: #1f2a2e; }
+          h1 { color: #174a37; }
+          li { margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <h1>SilverLink My Plan Report</h1>
+        <p>Generated from the SilverLink advanced web application.</p>
+        <h2>Saved items</h2>
+        <ul>
+          ${savedPlan.value
+            .map((item) => `<li><strong>${sanitizeText(item.name || item.title)}</strong> - ${sanitizeText(item.summary || item.description)}</li>`)
+            .join('') || '<li>No saved items yet.</li>'}
+        </ul>
+        <h2>Ratings</h2>
+        <ul>
+          ${ratingSummaries.value
+            .map((item) => `<li>${sanitizeText(item.name)}: ${sanitizeText(item.average)}</li>`)
+            .join('')}
+        </ul>
+      </body>
+    </html>
+  `
+  const report = window.open('', '_blank')
+  if (report) {
+    report.document.write(html)
+    report.document.close()
+    report.focus()
+    report.print()
+  }
+}
+
+function selectMapLocation(location) {
+  selectedMapLocation.value = location
+}
+
+function getMarkerStyle(location) {
+  const bounds = {
+    minLat: -38.0,
+    maxLat: -37.86,
+    minLng: 145.07,
+    maxLng: 145.23
+  }
+  const left = ((location.lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100
+  const top = ((bounds.maxLat - location.lat) / (bounds.maxLat - bounds.minLat)) * 100
+  return {
+    left: `${Math.min(94, Math.max(4, left))}%`,
+    top: `${Math.min(90, Math.max(8, top))}%`
+  }
+}
+
+function getDistanceFromUser(location) {
+  const origin = currentUserArea.value
+  return haversineDistance(origin.lat, origin.lng, location.lat, location.lng)
+}
+
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const radius = 6371
+  const toRadians = (value) => (value * Math.PI) / 180
+  const dLat = toRadians(lat2 - lat1)
+  const dLng = toRadians(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2)
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function updateOnlineStatus() {
+  isOnline.value = navigator.onLine
 }
 
 function chooseEvent(eventId) {

@@ -194,21 +194,21 @@ Current C progress:
 
 ### Phase 4 - D Requirements
 
-- Add external auth if selected.
-- Add email with attachment through serverless/API integration or mockable service.
-- Add two interactive data tables.
-- Prepare production deployment.
+- Add external auth if selected. - Implemented with Firebase Auth REST configuration
+- Add email with attachment through serverless/API integration or mockable service. - Implemented with Netlify function and demo fallback
+- Add two interactive data tables. - Complete
+- Prepare production deployment. - Netlify configuration added
 
 ### Phase 5 - E Requirements
 
-- Add serverless functions.
-- Add map view with at least two meaningful features.
-- Add accessibility audit fixes.
-- Add CSV/PDF export.
+- Add serverless functions. - Complete
+- Add map view with at least two meaningful features. - Complete
+- Add accessibility audit fixes. - Implemented with skip link, labels, focus styles, large text and high contrast mode
+- Add CSV/PDF export. - Complete
 
 ### Phase 6 - F Requirements And Submission Polish
 
-- Implement four innovation features.
+- Implement four innovation features. - Implemented admin dashboard, chart, booking calendar, offline/PWA support and smart recommendations
 - Write research report.
 - Fill submission template.
 - Record demo video.

@@ -49,6 +49,49 @@ Admin demo account:
 - Email: `admin@silverlink.test`
 - Password: `AdminPass123`
 
+## A3 Advanced Requirement Coverage
+
+### Business Requirement D
+
+- D.1: Firebase Authentication REST integration is prepared through `VITE_FIREBASE_API_KEY`.
+- D.2: Email with attachment is handled through `netlify/functions/send-email.js`.
+- D.3: Two interactive tables are implemented:
+  - service directory table
+  - activity registration table
+  Both support sorting, global search, column search and pagination with a maximum of 10 rows per page.
+- D.4: Netlify deployment configuration is included in `netlify.toml`.
+
+### Business Requirement E
+
+- E.1: Serverless functions are implemented for email and data export.
+- E.2: Map and location features are implemented:
+  - service/activity markers
+  - category/search filtering
+  - user-area simulation
+  - nearest options and distance calculation
+- E.3: Accessibility features include labelled controls, keyboard focus styles, skip link, high contrast mode and large text mode.
+- E.4: Data export supports CSV download and a print-ready report that can be saved as PDF.
+
+### Business Requirement F
+
+Selected innovation features:
+
+1. Admin dashboard with metrics and management tables.
+2. Interactive service category chart.
+3. Booking calendar for community activities.
+4. Offline/PWA support with draft recovery.
+5. Smart recommendation assistant.
+
+## Optional Environment Variables
+
+Create `.env` from `.env.example` when using external services:
+
+```bash
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+RESEND_API_KEY=your_resend_key
+EMAIL_FROM="SilverLink <your-sender@example.com>"
+```
+
 ## Run Locally
 
 ```bash
