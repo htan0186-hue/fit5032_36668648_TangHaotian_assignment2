@@ -185,12 +185,19 @@ Recommended four UX-focused innovation features:
 
 Current C progress:
 
-- C.1 authentication is implemented with local demo registration, login, logout, session persistence and account management.
-- C.2 role access is implemented with visitor/member/admin differences.
+- C.1 authentication is implemented with local demo registration, login, logout, short-lived session persistence and account management.
+- C.2 role access is implemented with visitor/member/admin differences and verified session claims.
 - Member-only access controls protect My Plan saving and activity registration.
 - Admin-only access controls protect the Admin statistics and user table section.
 - C.3 rating is implemented for services and activities, with average rating display.
-- C.4 basic security is implemented through input validation, sanitised user text, no untrusted HTML rendering, role checks and hashed demo password storage.
+- C.4 basic security is implemented through input validation, sanitised user text, no untrusted HTML rendering, verified role claims, hashed demo password storage, Firestore rules and Cloud Function admin checks.
+
+Security improvement after A2 feedback:
+
+- The previous local session stored only a user id, so an edited browser storage value could influence role-gated UI.
+- The current implementation stores a short-lived session object with a hashed proof and verified claims.
+- The admin UI requires `claimsVerified` and the admin role, not only a `role` field on a stored user object.
+- Backend access-control evidence is now committed through `firestore.rules`, `firebase.json`, and `firebase-functions/index.js`.
 
 ### Phase 4 - D Requirements
 

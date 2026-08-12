@@ -28,11 +28,11 @@ SilverLink is a Vue 3 web application for older adults, family supporters and ca
   - member account registration
   - login and logout
   - account/profile management
-  - persistent local demo session
+  - persistent local demo session with expiry and verified session claims
 - C.2: Role-based access is implemented:
   - visitors can browse public services and activities
   - logged-in members can save My Plan items and submit activity registrations
-  - admins can access the protected Admin area
+  - admins can access the protected Admin area only when the session includes a verified admin claim
 - C.3: Rating is implemented:
   - members can rate individual services and activities
   - the app calculates and displays average ratings
@@ -41,8 +41,10 @@ SilverLink is a Vue 3 web application for older adults, family supporters and ca
   - no untrusted HTML rendering
   - user-entered text is sanitised before display/storage
   - rating scores and form data are validated
-  - role-protected sections prevent unauthorised actions
+  - role-protected sections use verified session claims instead of trusting editable Local Storage role values
   - demo passwords are stored as SHA-256 hashes instead of plain text
+  - `firestore.rules` documents backend read/write permissions for public data, users, ratings and admin reports
+  - `firebase-functions/index.js` includes callable examples that verify Firebase custom claims before admin actions
 
 Admin demo account:
 
@@ -90,7 +92,22 @@ Create `.env` from `.env.example` when using external services:
 VITE_FIREBASE_API_KEY=your_firebase_api_key
 RESEND_API_KEY=your_resend_key
 EMAIL_FROM="SilverLink <your-sender@example.com>"
+SILVERLINK_EXPORT_TOKEN=your_private_export_token
 ```
+
+## Security Notes
+
+The app keeps Local Storage for assignment-friendly demo persistence, but role
+authorization is not taken directly from editable stored user records. Login
+creates a short-lived session containing verified claims. The local demo admin
+claim is issued only for the trusted demo admin email plus the expected password
+hash; Firebase sign-in can also use a custom `role` claim from the ID token.
+
+Backend access-control evidence is included in the repository:
+
+- `firestore.rules`: public reads are separated from signed-in writes and admin-only collections.
+- `firebase-functions/index.js`: admin Cloud Functions call `requireAdmin()` before sensitive work.
+- `netlify/functions/export-data.js`: deployment can require `SILVERLINK_EXPORT_TOKEN` before export.
 
 ## Run Locally
 

@@ -113,7 +113,8 @@
           <h2 id="account-title">Sign in to save, register and manage details</h2>
           <p>
             SilverLink includes Category C account registration, login, profile
-            management and role-based access with safer local demo storage.
+            management and role-based access with verified session claims instead
+            of trusting editable browser storage for roles.
           </p>
         </div>
 
@@ -239,11 +240,12 @@
         <div v-else class="account-dashboard">
           <article class="profile-summary">
             <span class="tag">{{ currentUser.role }}</span>
+            <span class="tag subtle">{{ currentUser.authModeLabel }}</span>
             <h3>Welcome, {{ currentUser.name }}</h3>
             <p>{{ currentUser.email }}</p>
             <p class="muted">
               Your account controls access to saved plans, activity registration and
-              role-specific tools.
+              role-specific tools. Admin access requires a verified session claim.
             </p>
           </article>
 
@@ -1046,6 +1048,10 @@ const RATINGS_KEY = 'silverlink-ratings'
 const OFFLINE_DRAFT_KEY = 'silverlink-offline-draft'
 const ACCESSIBILITY_KEY = 'silverlink-accessibility'
 const TABLE_PAGE_SIZE = 10
+const SESSION_DURATION_MS = 2 * 60 * 60 * 1000
+const TRUSTED_ADMIN_EMAILS = ['admin@silverlink.test']
+const LOCAL_AUTH_PROVIDER = 'local-demo'
+const FIREBASE_AUTH_PROVIDER = 'firebase-auth'
 
 const defaultUsers = [
   {
@@ -1065,7 +1071,7 @@ const serviceSearch = ref('')
 const savedPlan = ref(loadSavedPlan())
 const users = ref(loadUsers())
 const ratings = ref(loadRatings())
-const currentUserId = ref(localStorage.getItem(SESSION_KEY) || '')
+const currentSession = ref(loadSession())
 const successMessage = ref('')
 const authMessage = ref('')
 const errors = reactive({})
@@ -1149,8 +1155,16 @@ const userAreas = [
 ]
 
 const totalListings = computed(() => services.length + events.length)
-const currentUser = computed(() => users.value.find((user) => user.id === currentUserId.value))
-const isAdmin = computed(() => currentUser.value?.role === 'admin')
+const currentUser = computed(() => {
+  const user = users.value.find((item) => item.id === currentSession.value.userId)
+
+  if (!user || !currentSession.value.claims.verified || currentSession.value.expiresAt <= Date.now()) {
+    return null
+  }
+
+  return decorateSessionUser(user, currentSession.value.claims)
+})
+const isAdmin = computed(() => currentUser.value?.role === 'admin' && currentUser.value?.claimsVerified)
 const memberCount = computed(() => users.value.filter((user) => user.role === 'member').length)
 const ratingSummaries = computed(() => [
   ...services.map((service) => ({
@@ -1296,13 +1310,17 @@ watch(
   { deep: true }
 )
 
-watch(currentUserId, (userId) => {
-  if (userId) {
-    localStorage.setItem(SESSION_KEY, userId)
-  } else {
-    localStorage.removeItem(SESSION_KEY)
-  }
-})
+watch(
+  currentSession,
+  (session) => {
+    if (session.userId && session.claims.verified && session.expiresAt > Date.now()) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    } else {
+      localStorage.removeItem(SESSION_KEY)
+    }
+  },
+  { deep: true }
+)
 
 watch(
   currentUser,
@@ -1350,11 +1368,129 @@ watch(
 onMounted(async () => {
   await migrateLegacyPasswords()
   migrateStoredRatings()
-  syncCurrentUser()
+  syncCurrentSession()
   selectedMapLocation.value = filteredMapLocations.value[0] || null
   window.addEventListener('online', updateOnlineStatus)
   window.addEventListener('offline', updateOnlineStatus)
 })
+
+function emptySession() {
+  return {
+    userId: '',
+    issuedAt: 0,
+    expiresAt: 0,
+    sessionProof: '',
+    claims: {
+      role: 'visitor',
+      provider: '',
+      issuedAt: 0,
+      expiresAt: 0,
+      verified: false
+    }
+  }
+}
+
+function loadSession() {
+  try {
+    const stored = localStorage.getItem(SESSION_KEY)
+
+    if (!stored) {
+      return emptySession()
+    }
+
+    if (!stored.trim().startsWith('{')) {
+      localStorage.removeItem(SESSION_KEY)
+      return emptySession()
+    }
+
+    const parsed = JSON.parse(stored)
+
+    if (!isValidSessionShape(parsed) || parsed.expiresAt <= Date.now()) {
+      localStorage.removeItem(SESSION_KEY)
+      return emptySession()
+    }
+
+    return {
+      userId: sanitizeText(parsed.userId),
+      issuedAt: Number(parsed.issuedAt),
+      expiresAt: Number(parsed.expiresAt),
+      sessionProof: sanitizeText(parsed.sessionProof),
+      claims: sanitiseClaims(parsed.claims)
+    }
+  } catch {
+    localStorage.removeItem(SESSION_KEY)
+    return emptySession()
+  }
+}
+
+function isValidSessionShape(session) {
+  return Boolean(
+    session &&
+      typeof session.userId === 'string' &&
+      Number.isFinite(Number(session.issuedAt)) &&
+      Number.isFinite(Number(session.expiresAt)) &&
+      typeof session.sessionProof === 'string' &&
+      session.sessionProof.length >= 64 &&
+      session.claims &&
+      session.claims.verified === true &&
+      Number(session.expiresAt) > Number(session.issuedAt)
+  )
+}
+
+function sanitiseClaims(claims = {}) {
+  return {
+    role: claims.role === 'admin' ? 'admin' : claims.role === 'member' ? 'member' : 'visitor',
+    provider: sanitizeText(claims.provider || ''),
+    issuedAt: Number(claims.issuedAt || 0),
+    expiresAt: Number(claims.expiresAt || 0),
+    verified: Boolean(claims.verified)
+  }
+}
+
+async function createSessionForUser(user, provider, proofSource = '') {
+  const issuedAt = Date.now()
+  const expiresAt = issuedAt + SESSION_DURATION_MS
+  const claims = await resolveVerifiedClaims(user, provider, issuedAt, expiresAt)
+
+  currentSession.value = {
+    userId: user.id,
+    issuedAt,
+    expiresAt,
+    sessionProof: await hashPassword(`${user.id}:${provider}:${proofSource}:${issuedAt}`),
+    claims
+  }
+}
+
+async function resolveVerifiedClaims(user, provider, issuedAt, expiresAt) {
+  const localTrustedAdmin =
+    provider === LOCAL_AUTH_PROVIDER &&
+    TRUSTED_ADMIN_EMAILS.includes(user.email) &&
+    user.passwordHash === defaultUsers[0].passwordHash
+  const firebaseAdminClaim = provider === FIREBASE_AUTH_PROVIDER && user.claims?.role === 'admin'
+  const role = localTrustedAdmin || firebaseAdminClaim ? 'admin' : 'member'
+
+  return {
+    role,
+    provider,
+    issuedAt,
+    expiresAt,
+    verified: true
+  }
+}
+
+function decorateSessionUser(user, claims) {
+  return {
+    ...user,
+    role: claims.role,
+    claimsVerified: claims.verified,
+    authProvider: claims.provider,
+    authModeLabel: claims.provider === FIREBASE_AUTH_PROVIDER ? 'Firebase verified' : 'Local verified'
+  }
+}
+
+function clearSession() {
+  currentSession.value = emptySession()
+}
 
 function loadSavedPlan() {
   try {
@@ -1510,9 +1646,11 @@ async function migrateLegacyPasswords() {
   }
 }
 
-function syncCurrentUser() {
-  if (currentUserId.value && !currentUser.value) {
-    currentUserId.value = ''
+function syncCurrentSession() {
+  const expired = currentSession.value.expiresAt <= Date.now()
+
+  if (currentSession.value.userId && (!currentUser.value || expired)) {
+    clearSession()
   }
 }
 
@@ -1601,6 +1739,7 @@ async function externalFirebaseLogin() {
       return
     }
 
+    const tokenClaims = parseJwtPayload(result.idToken)
     const existing = users.value.find((user) => user.email === email)
     const externalUser = existing || {
       id: `firebase-${result.localId}`,
@@ -1609,14 +1748,29 @@ async function externalFirebaseLogin() {
       passwordHash: '',
       role: 'member',
       phone: '',
-      preferences: 'External Firebase account'
+      preferences: 'External Firebase account',
+      claims: {
+        role: tokenClaims.role === 'admin' || tokenClaims.admin === true ? 'admin' : 'member'
+      }
     }
 
     if (!existing) {
       users.value.push(externalUser)
+    } else {
+      users.value = users.value.map((user) =>
+        user.id === existing.id
+          ? {
+              ...user,
+              claims: {
+                role: tokenClaims.role === 'admin' || tokenClaims.admin === true ? 'admin' : 'member'
+              }
+            }
+          : user
+      )
     }
 
-    currentUserId.value = externalUser.id
+    const sessionUser = users.value.find((user) => user.email === email) || externalUser
+    await createSessionForUser(sessionUser, FIREBASE_AUTH_PROVIDER, result.idToken)
     authMessage.value = 'Signed in with Firebase Authentication.'
     externalAuthForm.email = ''
     externalAuthForm.password = ''
@@ -1709,7 +1863,7 @@ async function callServerlessExport() {
     })
     serverlessStatus.value = response.ok
       ? 'Serverless export function responded successfully.'
-      : 'Serverless export function returned an error.'
+      : 'Serverless export is protected; configure the admin export token in deployment.'
   } catch {
     serverlessStatus.value =
       'Local Vite preview cannot run Netlify Functions; deploy with Netlify to test serverless export.'
@@ -1919,7 +2073,7 @@ async function login() {
     )
   }
 
-  currentUserId.value = user.id
+  await createSessionForUser(user, LOCAL_AUTH_PROVIDER, enteredHash)
   loginForm.email = ''
   loginForm.password = ''
   authMessage.value = `Welcome back, ${user.name}.`
@@ -1969,7 +2123,7 @@ async function registerUser() {
   }
 
   users.value.push(newUser)
-  currentUserId.value = newUser.id
+  await createSessionForUser(newUser, LOCAL_AUTH_PROVIDER, newUser.passwordHash)
   registerForm.name = ''
   registerForm.email = ''
   registerForm.password = ''
@@ -2060,6 +2214,11 @@ function getTargetName(type, id) {
 function updateAccount() {
   clearAuthErrors()
 
+  if (!currentUser.value) {
+    authMessage.value = 'Please sign in before updating account details.'
+    return
+  }
+
   if (!accountForm.name) {
     authErrors.accountName = 'Display name is required.'
     authMessage.value = ''
@@ -2067,7 +2226,7 @@ function updateAccount() {
   }
 
   users.value = users.value.map((user) =>
-    user.id === currentUserId.value
+    user.id === currentUser.value.id
       ? {
           ...user,
           name: sanitizeText(accountForm.name),
@@ -2080,7 +2239,7 @@ function updateAccount() {
 }
 
 function logout() {
-  currentUserId.value = ''
+  clearSession()
   successMessage.value = ''
   authMessage.value = 'You have been logged out.'
 }
@@ -2127,6 +2286,22 @@ function normaliseEmail(value) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function parseJwtPayload(token = '') {
+  try {
+    const [, payload] = token.split('.')
+
+    if (!payload) {
+      return {}
+    }
+
+    const normalised = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(normalised.padEnd(Math.ceil(normalised.length / 4) * 4, '='))
+    return JSON.parse(decoded)
+  } catch {
+    return {}
+  }
 }
 
 async function hashPassword(value) {

@@ -609,6 +609,13 @@ textarea {
   color: var(--teal);
 }
 
+.tag.subtle {
+  margin-left: 6px;
+  background: #f1f4f2;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .listing-card h3,
 .event-card h3,
 .saved-item h3,
