@@ -877,9 +877,33 @@ textarea {
 
 .table-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.table-status {
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.table-status strong {
+  color: var(--green-dark);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.table-status span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.table-status .text-button {
+  align-self: flex-start;
 }
 
 .interactive-table-wrap {

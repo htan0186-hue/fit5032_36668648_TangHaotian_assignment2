@@ -605,6 +605,13 @@
                 <span>Suburb filter</span>
                 <input v-model.trim="serviceTable.suburb" type="search" placeholder="Column search" />
               </label>
+              <div class="table-status" aria-live="polite">
+                <strong>{{ filteredServiceRows.length }}</strong>
+                <span>services found</span>
+                <button class="text-button" type="button" @click="resetServiceTable">
+                  Clear filters
+                </button>
+              </div>
             </div>
             <div class="admin-table-wrap interactive-table-wrap">
               <table class="admin-table interactive-table">
@@ -674,6 +681,13 @@
                 <span>Location filter</span>
                 <input v-model.trim="activityTable.location" type="search" placeholder="Column search" />
               </label>
+              <div class="table-status" aria-live="polite">
+                <strong>{{ filteredActivityRows.length }}</strong>
+                <span>activities found</span>
+                <button class="text-button" type="button" @click="resetActivityTable">
+                  Clear filters
+                </button>
+              </div>
             </div>
             <div class="admin-table-wrap interactive-table-wrap">
               <table class="admin-table interactive-table">
@@ -1038,7 +1052,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { events, serviceCategories, services } from './data/silverlinkData'
 
 const STORAGE_KEY = 'silverlink-saved-plan'
@@ -1374,6 +1388,11 @@ onMounted(async () => {
   window.addEventListener('offline', updateOnlineStatus)
 })
 
+onUnmounted(() => {
+  window.removeEventListener('online', updateOnlineStatus)
+  window.removeEventListener('offline', updateOnlineStatus)
+})
+
 function emptySession() {
   return {
     userId: '',
@@ -1695,6 +1714,24 @@ function previousPage(table) {
 
 function nextPage(table, pageCount) {
   table.page = Math.min(pageCount, table.page + 1)
+}
+
+function resetServiceTable() {
+  serviceTable.search = ''
+  serviceTable.category = ''
+  serviceTable.suburb = ''
+  serviceTable.sortKey = 'name'
+  serviceTable.sortDirection = 'asc'
+  serviceTable.page = 1
+}
+
+function resetActivityTable() {
+  activityTable.search = ''
+  activityTable.category = ''
+  activityTable.location = ''
+  activityTable.sortKey = 'date'
+  activityTable.sortDirection = 'asc'
+  activityTable.page = 1
 }
 
 async function externalFirebaseLogin() {
