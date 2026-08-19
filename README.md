@@ -1,4 +1,4 @@
-# SilverLink - FIT5032 Assignment 2
+# SilverLink - FIT5032 Assignment 3
 
 SilverLink is a Vue 3 web application for older adults, family supporters and carers. It helps users find local services, browse accessible community activities, save useful options and submit a guided activity registration form.
 
